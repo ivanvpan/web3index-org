@@ -188,6 +188,7 @@ const getRevenueByBlock = async (id, blockNumber, network) => {
 };
 
 export const getSnapshots = async (id, network) => {
+  // get timestamps for beginning of those periods
   const utcCurrentTime = dayjs();
   const utcOneDayBack = utcCurrentTime.subtract(1, "day").unix();
   const utcTwoDaysBack = utcCurrentTime.subtract(2, "day").unix();
@@ -207,6 +208,7 @@ export const getSnapshots = async (id, network) => {
     utcNinetyDaysBack,
   ];
 
+  // get block numbers for the time periods
   const [
     oneDayBlock,
     twoDayBlock,
@@ -217,6 +219,8 @@ export const getSnapshots = async (id, network) => {
     ninetyDayBlock,
   ] = await getBlocksFromTimestamps(timestamps, network);
 
+
+  // get total protocol revenue at specified block
   const oneDayResult = await getRevenueByBlock(id, oneDayBlock, network);
   const twoDayResult = await getRevenueByBlock(id, twoDayBlock, network);
   const oneWeekResult = await getRevenueByBlock(id, oneWeekBlock, network);
@@ -225,6 +229,7 @@ export const getSnapshots = async (id, network) => {
   const sixtyDayResult = await getRevenueByBlock(id, sixtyDayBlock, network);
   const ninetyDayResult = await getRevenueByBlock(id, ninetyDayBlock, network);
 
+  // return the list of revenues if each one exists
   return [
     oneDayResult.protocol?.revenueUSD ? +oneDayResult.protocol.revenueUSD : 0,
     twoDayResult.protocol?.revenueUSD ? +twoDayResult.protocol.revenueUSD : 0,

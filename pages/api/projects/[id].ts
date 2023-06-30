@@ -100,8 +100,11 @@ const getRevenueFromDB = async (projectId, date, prisma) => {
 };
 
 const getUsageFromSubgraph = async (id, networks) => {
+  // per-day data for each network
   const dayDataPromises = [];
+  // total revenue data for each network
   const snapshotPromises = [];
+
   networks.map((n) => {
     const data = request(
       getSubgraph(n),
@@ -123,6 +126,21 @@ const getUsageFromSubgraph = async (id, networks) => {
   });
 
   const dayData = await Promise.all(dayDataPromises);
+  /*
+    "protocol": {
+    "revenueUSD": "419182.9948519706462473501521869365",
+    "days": [
+      {
+        "date": 1578960000,
+        "revenueUSD": "1.227257265056428867048998570044557"
+      },
+      {
+        "date": 1579046400,
+        "revenueUSD": "15.10380062673922487381017530158649"
+      },
+
+  */
+
   const snapshotData = await Promise.all(snapshotPromises);
 
   let totalRevenue = 0;
@@ -130,6 +148,7 @@ const getUsageFromSubgraph = async (id, networks) => {
     totalRevenue += +d.protocol.revenueUSD;
   });
 
+  // assume it's the sum across networks
   const [
     oneDayAgo,
     twoDaysAgo,
@@ -139,18 +158,39 @@ const getUsageFromSubgraph = async (id, networks) => {
     sixtyDaysAgo,
     ninetyDaysAgo,
   ] = [...sumArrays(...snapshotData)];
+  console.log(snapshotData[0], snapshotData[1], [
+    oneDayAgo,
+    twoDaysAgo,
+    oneWeekAgo,
+    twoWeeksAgo,
+    thirtyDaysAgo,
+    sixtyDaysAgo,
+    ninetyDaysAgo,
+  ])
 
+  // Not sure what for
   const dayIndexSet = new Set();
+  // seconds in a day
   const oneDay = 24 * 60 * 60;
 
+  // Concatenation of date object array from different networks
+  // {
+  //   "date": 1578960000,
+  //   "revenueUSD": "1.227257265056428867048998570044557"
+  // },
   let daysRaw = [];
+  // This assumes that a protocol does not earn revenues on two networks at the same time
+  // but, as in the case of livepeer and thegraph, runs on mainnet and then migrates to L2.
+  // Also, below fees from migration day are excluded from
   dayData.map((d) => {
     daysRaw = [...daysRaw, ...d.protocol.days];
   });
 
   let days = [];
   daysRaw.forEach((day) => {
+    // mark the date as existing?
     dayIndexSet.add((day.date / oneDay).toFixed(0));
+    // convert date into integer days
     days.push({
       date: day.date,
       // ignore revenue from day the graph migrated to arbitrum
@@ -158,6 +198,7 @@ const getUsageFromSubgraph = async (id, networks) => {
     });
   });
 
+  // probably something to account for sparse data - add 0 values to days for which there isn't any data
   let timestamp = days[0].date;
   while (timestamp < Math.floor(+new Date() / 1000) - oneDay) {
     const nextDay = timestamp + oneDay;
@@ -173,6 +214,7 @@ const getUsageFromSubgraph = async (id, networks) => {
     timestamp = nextDay;
   }
 
+  // sort all the values by date
   days = days.sort((a, b) => (parseInt(a.date) > parseInt(b.date) ? 1 : -1));
   const revenue = {
     // ignore revenue from day the graph migrated to arbitrum
